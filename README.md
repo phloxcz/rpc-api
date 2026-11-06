@@ -1,5 +1,7 @@
 # phloxcz/rpc-api
 
+**English** | [Česky](README.cs.md)
+
 **[JSON-RPC 2.0](https://www.jsonrpc.org/specification) server for [Nette](https://nette.org).**
 
 API controllers are ordinary DI services. Their methods, authorization and parameters are described by PHP attributes and native types, and the method table is compiled into the DI container, so nothing is reflected at runtime.
@@ -8,7 +10,7 @@ API controllers are ordinary DI services. Their methods, authorization and param
 
 ## Requirements
 
-PHP 8.4+ and [`phloxcz/api-core`](../phlox-api-core), which documents controllers, authorization and parameter types.
+PHP 8.4+ and [`phloxcz/api-core`](https://github.com/phloxcz/api-core), which documents controllers, authorization and parameter types.
 
 ## Installation
 
@@ -86,7 +88,7 @@ Requests other than `POST` and `OPTIONS` to an endpoint, and all requests elsewh
 
 ## DTOs
 
-A parameter can be a DTO, and a method can return one. See [DTOs](../phlox-api-core#dtos).
+A parameter can be a DTO, and a method can return one. See [DTOs](https://github.com/phloxcz/api-core#dtos).
 
 ```php
 public function save(CreateUser $input): UserOutput { /* ... */ }
@@ -100,7 +102,7 @@ Invalid data gets code `-32602` with all problems in `fields`, such as `input.na
 
 ## OpenRPC
 
-Every endpoint gets an OpenRPC document, generated when the container compiles from the same methods the server runs on. In debug mode it's published as the method `rpc.discover`, which is how the specification finds it. What it's made of is described in [`phloxcz/api-core`](../phlox-api-core#documentation).
+Every endpoint gets an OpenRPC document, generated when the container compiles from the same methods the server runs on. In debug mode it's published as the method `rpc.discover`, which is how the specification finds it. What it's made of is described in [`phloxcz/api-core`](https://github.com/phloxcz/api-core#documentation).
 
 ```neon
 rpcApi:
@@ -134,7 +136,7 @@ Without `allowedOrigins`, no CORS headers are sent. An origin not on the list ge
 
 ## Migrating from abrad450/api-server-nette
 
-The whole way is in [`MIGRATION.md`](../phlox-api-core/MIGRATION.md). What concerns this package:
+The whole way is in [`MIGRATION.md`](https://github.com/phloxcz/api-core/blob/master/MIGRATION.md). What concerns this package:
 
 Namespaces:
 
@@ -159,7 +161,7 @@ Changes that need checking in an existing project:
 - **Stricter protocol:** failed notifications no longer send an error, and `"id": null` is no longer a notification.
 - **The bootstrap runs before the API.** Code after `createContainer()` now also runs for API requests, including anything like a redirect or a maintenance mode. `index.php` has to call `Application::run()`.
 - **Dates and times:** a time zone alone, such as `x` or `utc`, is now refused instead of meaning the current time.
-- **The query language** moved to [`phloxcz/api-query`](../phlox-api-query#migrating-from-abrad450api-server-nette), including `$this->processor`.
+- **The query language** moved to [`phloxcz/api-query`](https://github.com/phloxcz/api-query#migrating-from-abrad450api-server-nette), including `$this->processor`.
 
 ## License
 
