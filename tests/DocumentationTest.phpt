@@ -148,3 +148,12 @@ $application->onStartup[0](); // nothing happens in CLI, and no exit
 $withoutApplication = createContainer($config() . "\n\n", withApplication: false);
 Assert::false($withoutApplication->hasService('application.application'));
 Assert::contains("\$this->getService('rpcApi.server')->process()", $source($withoutApplication));
+
+// --- Results checked against the document, as tests of an API do
+
+$checker = Phlox\RpcApi\Testing\OpenRpcChecker::of($openRpc, 'api');
+Assert::same([], $checker->check('docs.secured', []));
+Assert::same(["rpc docs.secured: \$[0]: 'name' is missing"], $checker->check('docs.secured', [['addresses' => []]]), 'it sees a difference');
+Assert::same(['rpc docs.nothing: $: 1 is not null'], $checker->check('docs.nothing', 1));
+Assert::same(['rpc docs.missing: not documented'], $checker->check('docs.missing', null));
+Assert::same(3, $checker->checked);

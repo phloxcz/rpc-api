@@ -53,7 +53,7 @@ class DocsController extends ApiController
      */
     #[AllowAnonymous]
     #[Result(description: 'What was saved')]
-    #[Throws(409, 'Closed.', errorCode: 1001)]
+    #[Throws(errorCode: 1001, message: 'Closed.')]
     public function save(UserDto $input, #[Range(min: 1)] int $limit = 5): UserDto
     {
         return new UserDto($input->name, $input->addresses, created: new \DateTimeImmutable('2024-01-02T03:04:05+00:00'));

@@ -81,7 +81,7 @@ class UserController extends ApiController
 - Požadavek bez členu `id` je notifikace: spustí se a nic se neposílá zpět, ani chyba. `"id": null` je běžný požadavek.
 - Dávka větší než `maxBatchSize` se odmítne celá. V rámci dávky neovlivní selhané volání ostatní.
 - Chyby protokolu používají standardní kódy `-32700`, `-32600`, `-32601`, `-32602` a `-32603`, viz `ProtocolError`. Chyby autorizace používají `401` a `403`.
-- `ApiException` dá svůj `errorCode`, a bez něj svůj HTTP stav: `new ApiException(404, 'Not found.')` má kód `404`. `#[Throws]` dokumentuje stejný kód.
+- `ApiException` dá svůj `errorCode`, a bez něj svůj HTTP stav: `new ApiException(404, 'Not found.')` má kód `404`. Stav lze vynechat: `new ApiException(errorCode: 1001, message: 'Closed.')`. `#[Throws]` dokumentuje stejný kód a přijímá totéž.
 - `data` z `ApiException` se sloučí přímo do objektu `error`, vedle `code` a `message`.
 - HTTP stav je `200` pro cokoli s tělem a `204`, když tělo není.
 
@@ -128,6 +128,19 @@ public function import(array $orders): array { /* ... */ }
 ```
 
 Autorizace v OpenRPC nemá své místo, takže metoda vyžadující přihlášení nese `x-authorize` a `x-roles`, totéž v popisu a chyby `401` a `403`. Dokud je dokument zveřejněný, vlastní metoda s názvem `rpc.discover` selže při kompilaci kontejneru.
+
+### Test, že výsledky odpovídají dokumentu
+
+`OpenRpcChecker` porovná výsledek s dokumentem, takže test pozná, když se dokumentace rozejde s tím, co API vrací:
+
+```php
+use Phlox\RpcApi\Testing\OpenRpcChecker;
+
+$checker = OpenRpcChecker::of($container->getByType(OpenRpc::class), 'rpc');
+Assert::same([], $checker->check('stats.tasks', $response['result']));
+```
+
+Nahlásí metodu, kterou dokument nemá, a každou hodnotu, která neodpovídá schématu, třeba `rpc stats.tasks: $.data[0].id: "3" is not integer`.
 
 ## CORS
 

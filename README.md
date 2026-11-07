@@ -81,7 +81,7 @@ class UserController extends ApiController
 - A request without an `id` member is a notification: it runs, and nothing is sent back, not even an error. `"id": null` is an ordinary request.
 - A batch larger than `maxBatchSize` is refused as a whole. Within a batch, a failing call doesn't affect the others.
 - Protocol errors use the standard codes `-32700`, `-32600`, `-32601`, `-32602` and `-32603`, see `ProtocolError`. Authorization errors use `401` and `403`.
-- An `ApiException` gives its `errorCode`, or its HTTP status without one: `new ApiException(404, 'Not found.')` is code `404`. `#[Throws]` documents the same code.
+- An `ApiException` gives its `errorCode`, or its HTTP status without one: `new ApiException(404, 'Not found.')` is code `404`. The status can be left out: `new ApiException(errorCode: 1001, message: 'Closed.')`. `#[Throws]` documents the same code, and takes the same.
 - `data` of an `ApiException` is merged straight into the `error` object, next to `code` and `message`.
 - The HTTP status is `200` for anything with a body and `204` when there's none.
 
@@ -128,6 +128,19 @@ public function import(array $orders): array { /* ... */ }
 ```
 
 Authorization has no place in OpenRPC, so a method requiring login carries `x-authorize` and `x-roles`, with the same in its description and errors `401` and `403`. While the document is published, a method of your own named `rpc.discover` fails when the container compiles.
+
+### Testing that results match it
+
+`OpenRpcChecker` checks a result against the document, so a test notices the documentation drifting from what the API returns:
+
+```php
+use Phlox\RpcApi\Testing\OpenRpcChecker;
+
+$checker = OpenRpcChecker::of($container->getByType(OpenRpc::class), 'rpc');
+Assert::same([], $checker->check('stats.tasks', $response['result']));
+```
+
+It reports a method the document doesn't have, and every value not matching the schema, such as `rpc stats.tasks: $.data[0].id: "3" is not integer`.
 
 ## CORS
 
