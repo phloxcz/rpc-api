@@ -33,6 +33,8 @@ final class Server
 {
     /**
      * @param array<string, AccessControl> $accessControl Endpoint name => CORS config
+     * @param array<string, array{path: string, page: string}> $published Endpoint => where its document is
+     *        published for GET, and the page pointing to it
      */
     public function __construct(
         private readonly Dispatcher $dispatcher,
@@ -41,6 +43,8 @@ final class Server
         private readonly IResponse $response,
         private readonly ErrorReporter $errorReporter,
         private readonly array $accessControl,
+        private readonly ?OpenRpc $documents = null,
+        private readonly array $published = [],
     ) {
     }
 
@@ -50,6 +54,9 @@ final class Server
     public function process(): bool
     {
         $method = $this->request->getMethod();
+        if ($method === IRequest::Get) {
+            return $this->serveDocument();
+        }
         if ($method !== IRequest::Post && $method !== 'OPTIONS') {
             return false;
         }
@@ -79,6 +86,39 @@ final class Server
         echo $output;
 
         return true;
+    }
+
+    /**
+     * The document for GET, as tools such as OpenRPC Playground can't call rpc.discover,
+     * and a page opening it there. Anything else of GET goes to the application.
+     */
+    private function serveDocument(): bool
+    {
+        $url = $this->request->getUrl();
+        $link = trim(substr($url->getPath(), strlen($url->getBasePath())), '/');
+
+        foreach ($this->published as $endpoint => $published) {
+            $path = "{$endpoint}/{$published['path']}";
+            if ($link !== $path && $link !== "{$path}.json") {
+                continue;
+            }
+
+            // Playground fetches it from another origin, so CORS of the endpoint holds
+            $this->cors->apply($this->accessControl[$endpoint]);
+            $this->response->setCode(IResponse::S200_OK);
+
+            if ($link === $path) {
+                $this->response->setContentType('text/html', 'utf-8');
+                echo $published['page'];
+            } else {
+                $this->response->setContentType('application/json', 'utf-8');
+                echo $this->documents?->toJson($endpoint) ?? '{}';
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

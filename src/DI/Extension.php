@@ -54,7 +54,9 @@ final class Extension extends Nette\DI\CompilerExtension
                     'authorize' => Expect::bool(true),
                     'maxBatchSize' => Expect::int(100)->min(1),
                     'accessControl' => CorsHandler::getConfigSchema(['POST', 'OPTIONS']),
-                    'documentation' => DocumentationConfig::getSchema(),
+                    'documentation' => DocumentationConfig::getSchema([
+                        'path' => Expect::string('openrpc'),
+                    ]),
                 ]),
                 'string',
             )->required(),
@@ -120,6 +122,7 @@ final class Extension extends Nette\DI\CompilerExtension
 
         $endpoints = [];
         $documents = [];
+        $published = [];
         foreach ($this->config->endpoints as $name => $endpoint) {
             $handlers = $this->buildHandlers($builder, (string) $name, $endpoint);
             $exposed = false;
@@ -141,6 +144,14 @@ final class Extension extends Nette\DI\CompilerExtension
                         . "but {$handlers[OpenRpcGenerator::DiscoverMethod]['class']}::{$handlers[OpenRpcGenerator::DiscoverMethod]['method']}() uses it.",
                     );
                 }
+
+                if ($exposed) {
+                    $path = trim($endpoint->documentation->path, '/');
+                    $published[$name] = [
+                        'path' => $path,
+                        'page' => self::buildPage($path, DocumentationConfig::buildInfo($endpoint->documentation->info, (string) $name)['title']),
+                    ];
+                }
             }
 
             $endpoints[$name] = [
@@ -158,6 +169,11 @@ final class Extension extends Nette\DI\CompilerExtension
         $openRpc = $builder->getDefinition($this->prefix('openRpc'));
         $openRpc->setArgument('documents', $documents);
 
+        /** @var Nette\DI\Definitions\ServiceDefinition $server */
+        $server = $builder->getDefinition($this->prefix('server'));
+        $server->setArgument('documents', $openRpc);
+        $server->setArgument('published', $published);
+
         $this->hookedToApplication = ServerStartup::hookApplication($builder, $this->prefix('server'));
     }
 
@@ -166,6 +182,51 @@ final class Extension extends Nette\DI\CompilerExtension
         if (!$this->hookedToApplication) {
             ServerStartup::hookContainer($class, $this->prefix('server'));
         }
+    }
+
+    /**
+     * A page opening the document in OpenRPC Playground, which shows it and calls nothing.
+     * There's no viewer as small as Swagger UI to put on the page itself.
+     */
+    private static function buildPage(string $path, string $title): string
+    {
+        $e = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_HTML5);
+        $document = json_encode(basename($path) . '.json', JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_THROW_ON_ERROR);
+        $endpoint = json_encode(str_repeat('../', substr_count($path, '/')) . '.', JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_THROW_ON_ERROR);
+
+        return <<<HTML
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>{$e($title)}</title>
+                <style>
+                    body { font: 16px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; color: #1f2328; background: #fff; }
+                    a.button { display: inline-block; padding: .6rem 1rem; border-radius: .4rem; background: #0969da; color: #fff; text-decoration: none; }
+                    code, pre { background: #f6f8fa; border-radius: .3rem; padding: .1rem .3rem; }
+                    pre { padding: .8rem; overflow-x: auto; }
+                    @media (prefers-color-scheme: dark) { body { color: #e6edf3; background: #0d1117; } code, pre { background: #161b22; } }
+                </style>
+            </head>
+            <body>
+                <h1>{$e($title)}</h1>
+                <p>The <a id="document" href="">OpenRPC document</a> of this JSON-RPC endpoint, as <code>rpc.discover</code> gives it.</p>
+                <p><a id="playground" class="button" href="">Open in OpenRPC Playground</a></p>
+                <p>Playground reads the document from your browser, so it reaches a server on your computer as well. On a server elsewhere, its <code>accessControl</code> has to allow <code>https://playground.open-rpc.org</code>.</p>
+                <p>Methods are called by POST to <code id="endpoint"></code>:</p>
+                <pre id="example"></pre>
+                <script>
+                    const documentUrl = new URL({$document}, location.href).href;
+                    const endpointUrl = new URL({$endpoint}, location.href).href.replace(/\/$/, '');
+                    document.getElementById('document').href = documentUrl;
+                    document.getElementById('playground').href = 'https://playground.open-rpc.org/?schemaUrl=' + encodeURIComponent(documentUrl);
+                    document.getElementById('endpoint').textContent = endpointUrl;
+                    document.getElementById('example').textContent = "curl -X POST -H 'Content-Type: application/json' \\\\\\n     -d '{\"jsonrpc\":\"2.0\",\"method\":\"rpc.discover\",\"id\":1}' \\\\\\n     " + endpointUrl;
+                </script>
+            </body>
+            </html>
+            HTML;
     }
 
     /**

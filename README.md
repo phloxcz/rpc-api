@@ -103,7 +103,7 @@ Invalid data gets code `-32602` with all problems in `fields`, such as `input.na
 
 ## OpenRPC
 
-Every endpoint gets an OpenRPC document, generated when the container compiles from the same methods the server runs on. In debug mode it's published as the method `rpc.discover`, which is how the specification finds it. What it's made of is described in [`phloxcz/api-core`](https://github.com/phloxcz/api-core#documentation).
+Every endpoint gets an OpenRPC document, generated when the container compiles from the same methods the server runs on. In debug mode it's published as the method `rpc.discover`, which is how the specification finds it, and for `GET` at `/rpc/openrpc.json`, which tools read. `/rpc/openrpc` is a page opening it in [OpenRPC Playground](https://playground.open-rpc.org), which shows the methods, their parameters and results. Playground reads the document from your browser, so it reaches a server on your computer as well; on a server elsewhere, `accessControl` has to allow `https://playground.open-rpc.org`. What it's made of is described in [`phloxcz/api-core`](https://github.com/phloxcz/api-core#documentation).
 
 ```neon
 rpcApi:
@@ -113,6 +113,7 @@ rpcApi:
             documentation:
                 expose: true        # by default only in debug mode
                 info: {title: Orders API, version: 2.1.0}
+                path: openrpc       # gives /rpc/openrpc.json and the page at /rpc/openrpc
                 servers:            # OpenRPC needs an absolute URL, so it's left out by default
                     - {name: production, url: 'https://api.example.com/api'}
 ```

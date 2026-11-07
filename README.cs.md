@@ -103,7 +103,7 @@ Neplatná data dostanou kód `-32602` se všemi problémy ve `fields`, napříkl
 
 ## OpenRPC
 
-Každý endpoint dostane dokument OpenRPC, vygenerovaný při kompilaci kontejneru ze stejných metod, podle kterých server běží. V debug režimu je zveřejněný jako metoda `rpc.discover`, kde ho hledá specifikace. Z čeho se skládá, popisuje [`phloxcz/api-core`](https://github.com/phloxcz/api-core/blob/master/README.cs.md#dokumentace).
+Každý endpoint dostane dokument OpenRPC, vygenerovaný při kompilaci kontejneru ze stejných metod, podle kterých server běží. V debug režimu je zveřejněný jako metoda `rpc.discover`, kde ho hledá specifikace, a pro `GET` na `/rpc/openrpc.json`, kde ho čtou nástroje. `/rpc/openrpc` je stránka, která ho otevře v [OpenRPC Playground](https://playground.open-rpc.org), kde jsou vidět metody, jejich parametry a výsledky. Playground čte dokument z vašeho prohlížeče, takže dosáhne i na server ve vašem počítači; u serveru jinde musí `accessControl` povolit `https://playground.open-rpc.org`. Z čeho se skládá, popisuje [`phloxcz/api-core`](https://github.com/phloxcz/api-core/blob/master/README.cs.md#dokumentace).
 
 ```neon
 rpcApi:
@@ -113,6 +113,7 @@ rpcApi:
             documentation:
                 expose: true        # ve výchozím stavu jen v debug režimu
                 info: {title: Orders API, version: 2.1.0}
+                path: openrpc       # dá /rpc/openrpc.json a stránku na /rpc/openrpc
                 servers:            # OpenRPC potřebuje absolutní URL, proto je ve výchozím stavu vynechané
                     - {name: production, url: 'https://api.example.com/api'}
 ```
