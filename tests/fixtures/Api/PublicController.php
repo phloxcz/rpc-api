@@ -38,7 +38,7 @@ class PublicController extends ApiController
 
     public function fail(): never
     {
-        throw new ApiException(1234, 'Public failure', 'secret detail', data: ['field' => 'name', 'code' => 'spoofed']);
+        throw new ApiException(409, 'Public failure', errorCode: 1234, internal: 'secret detail', data: ['field' => 'name', 'code' => 'spoofed']);
     }
 
     public function crash(): never

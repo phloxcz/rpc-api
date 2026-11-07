@@ -11,6 +11,8 @@ use Phlox\ApiCore\Attributes\Constraints\Length;
 use Phlox\ApiCore\Attributes\Constraints\Range;
 use Phlox\ApiCore\Attributes\Dto;
 use Phlox\ApiCore\Attributes\Throws;
+use Phlox\ApiCore\Schema\ListOf;
+use Phlox\RpcApi\Attributes\Result;
 
 enum Role: string
 {
@@ -48,10 +50,10 @@ class DocsController extends ApiController
      *
      * @param UserDto $input Who
      * @param int $limit How many
-     * @return UserDto What was saved
      */
     #[AllowAnonymous]
-    #[Throws(1001, 'Closed.')]
+    #[Result(description: 'What was saved')]
+    #[Throws(409, 'Closed.', errorCode: 1001)]
     public function save(UserDto $input, #[Range(min: 1)] int $limit = 5): UserDto
     {
         return new UserDto($input->name, $input->addresses, created: new \DateTimeImmutable('2024-01-02T03:04:05+00:00'));
@@ -61,7 +63,17 @@ class DocsController extends ApiController
      * @return list<UserDto>
      * @deprecated
      */
+    #[Result(new ListOf(UserDto::class))]
     public function secured(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<UserDto> For PHPStan only
+     */
+    #[AllowAnonymous]
+    public function unread(): array
     {
         return [];
     }

@@ -6,6 +6,7 @@
 
 declare(strict_types=1);
 
+use Phlox\ApiCore\ProtocolError;
 use Phlox\ApiCore\ApiException;
 use Phlox\RpcApi\Dispatcher;
 use Phlox\RpcApi\Tests\Fixtures\RecordingLogger;
@@ -40,5 +41,5 @@ ini_set('error_log', __DIR__ . '/tmp/' . getmypid() . '/error.log');
 
 $logger->broken = true;
 $response = $call('public.crash');
-Assert::same(ApiException::E_INTERNAL_ERROR, $response['error']['code']);
+Assert::same(ProtocolError::InternalError->value, $response['error']['code']);
 Assert::same(1, $response['id']);

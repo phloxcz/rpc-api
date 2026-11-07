@@ -12,11 +12,14 @@ declare(strict_types=1);
 
 namespace Phlox\RpcApi\Documentation;
 
+use Phlox\ApiCore\ProtocolError;
+use Phlox\ApiCore\Attributes\ErrorCase;
 use Phlox\ApiCore\ApiException;
 use Phlox\ApiCore\Documentation\DocumentationConfig;
 use Phlox\ApiCore\Documentation\MethodReader;
 use Phlox\ApiCore\Documentation\SchemaBuilder;
 use Phlox\ApiCore\Types\Type;
+use Phlox\RpcApi\Attributes\Result;
 
 /**
  * Generates an OpenRPC document from the same method table the server runs on.
@@ -44,7 +47,11 @@ final class OpenRpcGenerator
 
         $methods = [];
         foreach ($handlers as $name => $handler) {
-            $methods[] = $this->buildMethod((string) $name, $handler);
+            try {
+                $methods[] = $this->buildMethod((string) $name, $handler);
+            } catch (\InvalidArgumentException $e) {
+                throw new \LogicException("Documentation of {$handler['class']}::{$handler['method']}(): {$e->getMessage()}", previous: $e);
+            }
         }
 
         // Unlike OpenAPI, OpenRPC wants an absolute URL, which only the configuration can know
@@ -104,11 +111,14 @@ final class OpenRpcGenerator
             return $info['description'] === '' ? $descriptor : $descriptor + ['description' => $info['description']];
         }, $parameters));
 
+        $declared = $reader->getAttributes(Result::class)[0] ?? null;
         $return = $reader->getReturnType();
-        $method['result'] = ['name' => 'result', 'schema' => $reader->getDescribedResponse()
-            ?? ($return->kind === Type::Void ? ['type' => 'null'] : $this->builder->build($return))];
-        if ($reader->getReturnDescription() !== '') {
-            $method['result']['description'] = $reader->getReturnDescription();
+        $method['result'] = ['name' => 'result', 'schema' => $declared?->content !== null
+            ? $this->builder->buildDefinition($declared->content)
+            : $reader->getDescribedResponse() ?? ($return->kind === Type::Void ? ['type' => 'null'] : $this->builder->build($return))];
+        $description = $declared->description ?? '';
+        if ($description !== '') {
+            $method['result']['description'] = $description;
         }
 
         $errors = $this->buildErrors($reader, $handler, $parameters !== []);
@@ -141,10 +151,10 @@ final class OpenRpcGenerator
             $errors[403] = 'Missing role.';
         }
         if ($hasParameters) {
-            $errors[ApiException::E_INVALID_PARAMS] = ApiException::E_INVALID_PARAMS_TEXT;
+            $errors[ProtocolError::InvalidParams->value] = ErrorCase::of(ProtocolError::InvalidParams)->message;
         }
         foreach ($reader->getThrows() as $throws) {
-            $errors[$throws->code] = $throws->message;
+            $errors[$throws->errorCode ?? $throws->httpCode] = $throws->message;
         }
 
         $result = [];

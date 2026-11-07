@@ -80,7 +80,8 @@ class UserController extends ApiController
 
 - Požadavek bez členu `id` je notifikace: spustí se a nic se neposílá zpět, ani chyba. `"id": null` je běžný požadavek.
 - Dávka větší než `maxBatchSize` se odmítne celá. V rámci dávky neovlivní selhané volání ostatní.
-- Chyby protokolu používají standardní kódy `-32700`, `-32600`, `-32601`, `-32602` a `-32603`. Chyby autorizace používají `401` a `403`.
+- Chyby protokolu používají standardní kódy `-32700`, `-32600`, `-32601`, `-32602` a `-32603`, viz `ProtocolError`. Chyby autorizace používají `401` a `403`.
+- `ApiException` dá svůj `errorCode`, a bez něj svůj HTTP stav: `new ApiException(404, 'Not found.')` má kód `404`. `#[Throws]` dokumentuje stejný kód.
 - `data` z `ApiException` se sloučí přímo do objektu `error`, vedle `code` a `message`.
 - HTTP stav je `200` pro cokoli s tělem a `204`, když tělo není.
 
@@ -114,6 +115,16 @@ rpcApi:
                 info: {title: Orders API, version: 2.1.0}
                 servers:            # OpenRPC potřebuje absolutní URL, proto je ve výchozím stavu vynechané
                     - {name: production, url: 'https://api.example.com/api'}
+```
+
+Výsledek se bere z nativního návratového typu nebo z `#[QueryOf]`. Kde to říká málo, třeba `array`, řekne ho `#[Result]` s objektem z [`Phlox\ApiCore\Schema`](https://github.com/phloxcz/api-core/blob/master/README.cs.md#popis-odpovědi). Docblock `@return` se nečte.
+
+```php
+use Phlox\ApiCore\Schema\{ListOf, Shape};
+use Phlox\RpcApi\Attributes\Result;
+
+#[Result(new Shape(['ids' => new ListOf('int')]), description: 'IDs of the new orders')]
+public function import(array $orders): array { /* ... */ }
 ```
 
 Autorizace v OpenRPC nemá své místo, takže metoda vyžadující přihlášení nese `x-authorize` a `x-roles`, totéž v popisu a chyby `401` a `403`. Dokud je dokument zveřejněný, vlastní metoda s názvem `rpc.discover` selže při kompilaci kontejneru.
@@ -161,6 +172,7 @@ Změny, které je potřeba v existujícím projektu zkontrolovat:
 - **Přísnější protokol:** neúspěšné notifikace už neposílají chybu a `"id": null` už není notifikace.
 - **Bootstrap běží před API.** Kód za `createContainer()` se teď spouští i pro požadavky na API, včetně věcí jako přesměrování nebo režim údržby. `index.php` musí volat `Application::run()`.
 - **Data a časy:** samotné časové pásmo, jako `x` nebo `utc`, se teď odmítne, místo aby znamenalo aktuální čas.
+- **Výsledky popisuje `#[Result]`,** ne `@return`. Metoda vracející `array` bez něj se zdokumentuje jako libovolné pole, viz [OpenRPC](#openrpc).
 - **Dotazovací jazyk** se přesunul do [`phloxcz/api-query`](https://github.com/phloxcz/api-query/blob/master/README.cs.md#přechod-z-abrad450api-server-nette), včetně `$this->processor`.
 
 ## Licence

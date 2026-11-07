@@ -6,6 +6,8 @@
 
 declare(strict_types=1);
 
+use Phlox\ApiCore\ProtocolError;
+use Phlox\ApiCore\Attributes\ErrorCase;
 use Nette\Security\SimpleIdentity;
 use Nette\Security\User;
 use Phlox\ApiCore\ApiException;
@@ -29,19 +31,19 @@ Assert::same(['jsonrpc' => '2.0', 'result' => 7, 'id' => 1], $call('public.add',
 Assert::same(7, $call('public.add', [3, 4])['result'], 'positional parameters');
 Assert::same(13, $call('public.add', ['a' => 3])['result'], 'default value');
 Assert::same('abc', $call('public.currentMethod', [], 'abc')['id'], 'string id');
-Assert::same(ApiException::E_INVALID_PARAMS, $errorCode($call('public.add', ['a' => 'x'])));
-Assert::same(ApiException::E_INVALID_PARAMS, $errorCode($call('public.add', [])));
+Assert::same(ProtocolError::InvalidParams->value, $errorCode($call('public.add', ['a' => 'x'])));
+Assert::same(ProtocolError::InvalidParams->value, $errorCode($call('public.add', [])));
 
 // --- Protocol errors
 
-Assert::same(ApiException::E_PARSE_ERROR, $errorCode($dispatcher->handle('api', '{not json')));
-Assert::same(ApiException::E_PARSE_ERROR, $errorCode($dispatcher->handle('api', '')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '[]')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '5')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '{"method":"public.add","id":1}')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '{"jsonrpc":"1.0","method":"public.add","id":1}')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '{"jsonrpc":"2.0","method":"public.add","params":5,"id":1}')));
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', '{"jsonrpc":"2.0","method":"public.add","id":{"a":1}}')));
+Assert::same(ProtocolError::ParseError->value, $errorCode($dispatcher->handle('api', '{not json')));
+Assert::same(ProtocolError::ParseError->value, $errorCode($dispatcher->handle('api', '')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '[]')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '5')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '{"method":"public.add","id":1}')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '{"jsonrpc":"1.0","method":"public.add","id":1}')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '{"jsonrpc":"2.0","method":"public.add","params":5,"id":1}')));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', '{"jsonrpc":"2.0","method":"public.add","id":{"a":1}}')));
 
 // A present null id is a request, not a notification
 Assert::same(
@@ -53,7 +55,7 @@ Assert::same(
 
 Assert::same('renamed', $call('custom.path.go')['result']);
 foreach (['publicadd', 'public/add', 'public..add', 'public.Add', 'nonsense', 'rpc.discover'] as $name) {
-    Assert::same(ApiException::E_METHOD_NOT_FOUND, $errorCode($call($name, ['a' => 1])), $name);
+    Assert::same(ProtocolError::MethodNotFound->value, $errorCode($call($name, ['a' => 1])), $name);
 }
 
 // --- Exposure
@@ -70,7 +72,7 @@ $notCallable = [
     'other.read' => 'namespace with the same prefix',
 ];
 foreach ($notCallable as $name => $reason) {
-    Assert::same(ApiException::E_METHOD_NOT_FOUND, $errorCode($call($name)), "$name: $reason");
+    Assert::same(ProtocolError::MethodNotFound->value, $errorCode($call($name)), "$name: $reason");
 }
 
 // --- Errors don't leak internals outside debug mode
@@ -81,8 +83,8 @@ Assert::same('Public failure', $failure['error']['message']);
 Assert::same('name', $failure['error']['field']);
 
 $crash = $call('public.crash');
-Assert::same(ApiException::E_INTERNAL_ERROR, $crash['error']['code']);
-Assert::same(ApiException::E_INTERNAL_ERROR_TEXT, $crash['error']['message']);
+Assert::same(ProtocolError::InternalError->value, $crash['error']['code']);
+Assert::same(ErrorCase::of(ProtocolError::InternalError)->message, $crash['error']['message']);
 Assert::same(1, $crash['id']);
 
 // --- terminate() and notifications produce nothing
@@ -106,10 +108,10 @@ $batch = $dispatcher->handle('api', json_encode([
 ]));
 Assert::count(4, $batch, 'notification has no response; invalid item has one');
 Assert::same('currentMethod', $batch[0]['result']);
-Assert::same(ApiException::E_INTERNAL_ERROR, $batch[1]['error']['code'], 'crash keeps its id');
+Assert::same(ProtocolError::InternalError->value, $batch[1]['error']['code'], 'crash keeps its id');
 Assert::same(2, $batch[1]['id']);
 Assert::same('otherMethod', $batch[2]['result'], 'parameters are refreshed for each call on the same controller');
-Assert::same(ApiException::E_INVALID_REQUEST, $batch[3]['error']['code']);
+Assert::same(ProtocolError::InvalidRequest->value, $batch[3]['error']['code']);
 Assert::null($batch[3]['id']);
 
 Assert::null($dispatcher->handle('api', json_encode([
@@ -117,7 +119,7 @@ Assert::null($dispatcher->handle('api', json_encode([
 ])), 'batch of notifications only');
 
 $tooLarge = array_fill(0, 6, ['jsonrpc' => '2.0', 'method' => 'public.add', 'params' => ['a' => 1], 'id' => 1]);
-Assert::same(ApiException::E_INVALID_REQUEST, $errorCode($dispatcher->handle('api', json_encode($tooLarge))));
+Assert::same(ProtocolError::InvalidRequest->value, $errorCode($dispatcher->handle('api', json_encode($tooLarge))));
 
 // --- Authorization
 
@@ -140,7 +142,7 @@ Assert::notContains('admin', $call('admin.secret', ['required' => 1])['error']['
 
 $user->login(new SimpleIdentity(1, ['admin']));
 Assert::same('secret', $call('admin.secret', ['required' => 1])['result']);
-Assert::same(ApiException::E_INVALID_PARAMS, $errorCode($call('admin.secret', [])), 'authorized client sees parameter errors');
+Assert::same(ProtocolError::InvalidParams->value, $errorCode($call('admin.secret', [])), 'authorized client sees parameter errors');
 Assert::same(403, $errorCode($call('admin.audit')), 'method and class roles add up');
 
 $user->login(new SimpleIdentity(1, ['admin', 'auditor']));

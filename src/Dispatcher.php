@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Phlox\RpcApi;
 
+use Phlox\ApiCore\ProtocolError;
 use Phlox\ApiCore\AbortException;
 use Phlox\ApiCore\ApiException;
 use Phlox\ApiCore\ControllerInvoker;
@@ -56,11 +57,11 @@ final class Dispatcher
         try {
             $request = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            return $this->buildError(new ApiException(ApiException::E_PARSE_ERROR, internal: $e->getMessage()), null);
+            return $this->buildError(new ApiException(ProtocolError::ParseError, internal: $e->getMessage()), null);
         }
 
         if (!is_array($request) || $request === []) {
-            return $this->buildError(new ApiException(ApiException::E_INVALID_REQUEST), null);
+            return $this->buildError(new ApiException(ProtocolError::InvalidRequest), null);
         }
 
         if (!array_is_list($request)) {
@@ -69,7 +70,7 @@ final class Dispatcher
 
         if (count($request) > $config['maxBatchSize']) {
             return $this->buildError(new ApiException(
-                ApiException::E_INVALID_REQUEST,
+                ProtocolError::InvalidRequest,
                 "Batch is too large, at most {$config['maxBatchSize']} calls are allowed.",
             ), null);
         }
@@ -92,21 +93,21 @@ final class Dispatcher
     private function processCall(string $endpoint, array $config, mixed $call): ?array
     {
         if (!is_array($call)) {
-            return $this->buildError(new ApiException(ApiException::E_INVALID_REQUEST), null);
+            return $this->buildError(new ApiException(ProtocolError::InvalidRequest), null);
         }
 
         $isNotification = !array_key_exists('id', $call);
         $id = $call['id'] ?? null;
 
         if (!is_string($id) && !is_int($id) && !is_float($id) && $id !== null) {
-            return $this->buildError(new ApiException(ApiException::E_INVALID_REQUEST), null);
+            return $this->buildError(new ApiException(ProtocolError::InvalidRequest), null);
         }
 
         $params = $call['params'] ?? [];
         $method = $call['method'] ?? null;
 
         if (($call['jsonrpc'] ?? null) !== self::JsonRpcVersion || !is_string($method) || !is_array($params)) {
-            return $this->buildError(new ApiException(ApiException::E_INVALID_REQUEST), $id);
+            return $this->buildError(new ApiException(ProtocolError::InvalidRequest), $id);
         }
 
         try {
@@ -119,7 +120,7 @@ final class Dispatcher
             }
 
             $handler = $config['handlers'][$method] ?? throw new ApiException(
-                ApiException::E_METHOD_NOT_FOUND,
+                ProtocolError::MethodNotFound,
                 internal: "No controller method is registered for '{$method}'.",
             );
 
@@ -131,7 +132,7 @@ final class Dispatcher
         } catch (\Throwable $e) {
             $this->errorReporter->report($e);
             return $isNotification ? null : $this->buildError(new ApiException(
-                ApiException::E_INTERNAL_ERROR,
+                ProtocolError::InternalError,
                 internal: $e->getMessage(),
             ), $id);
         }

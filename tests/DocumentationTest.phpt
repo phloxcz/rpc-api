@@ -7,6 +7,8 @@
 
 declare(strict_types=1);
 
+use Phlox\ApiCore\ProtocolError;
+use Phlox\ApiCore\Attributes\ErrorCase;
 use Nette\InvalidStateException;
 use Phlox\ApiCore\ApiException;
 use Phlox\RpcApi\Dispatcher;
@@ -42,7 +44,7 @@ Assert::false(isset($document['servers']), 'OpenRPC wants an absolute URL, which
 Assert::same(1, $document['x-custom']);
 
 $methods = array_column($document['methods'], null, 'name');
-Assert::same(['docs.nothing', 'docs.save', 'docs.secured'], array_keys($methods));
+Assert::same(['docs.nothing', 'docs.save', 'docs.secured', 'docs.unread'], array_keys($methods));
 
 $save = $methods['docs.save'];
 Assert::same('Saves a user.', $save['summary']);
@@ -58,7 +60,7 @@ Assert::same(
 );
 Assert::same(['name' => 'result', 'schema' => ['$ref' => '#/components/schemas/UserDto'], 'description' => 'What was saved'], $save['result']);
 Assert::same(
-    [['code' => ApiException::E_INVALID_PARAMS, 'message' => ApiException::E_INVALID_PARAMS_TEXT], ['code' => 1001, 'message' => 'Closed.']],
+    [['code' => ProtocolError::InvalidParams->value, 'message' => ErrorCase::of(ProtocolError::InvalidParams)->message], ['code' => 1001, 'message' => 'Closed.']],
     $save['errors'],
 );
 Assert::false(isset($save['x-authorize']), 'public');
@@ -74,6 +76,7 @@ Assert::same(['type' => 'array', 'items' => ['$ref' => '#/components/schemas/Use
 Assert::same([401, 403], array_column($secured['errors'], 'code'));
 
 Assert::same(['type' => 'null'], $methods['docs.nothing']['result']['schema']);
+Assert::same(['name' => 'result', 'schema' => ['type' => ['array', 'object']]], $methods['docs.unread']['result'], 'a docblock is not read for a result');
 Assert::false(isset($methods['docs.nothing']['errors']));
 
 $schemas = $document['components']['schemas'];
@@ -93,7 +96,7 @@ Assert::null($batch[1]['result']);
 
 $hidden = createContainer($config());
 Assert::same(
-    ApiException::E_METHOD_NOT_FOUND,
+    ProtocolError::MethodNotFound->value,
     $hidden->getByType(Dispatcher::class)->handle('api', '{"jsonrpc":"2.0","method":"rpc.discover","id":1}')['error']['code'],
     'not published in production',
 );
@@ -105,7 +108,7 @@ Assert::same('1.3.2', $debug->getByType(Dispatcher::class)->handle('api', '{"jso
 $off = createContainer($config('{enabled: false, expose: true}'));
 Assert::false($off->getByType(OpenRpc::class)->has('api'));
 Assert::same(
-    ApiException::E_METHOD_NOT_FOUND,
+    ProtocolError::MethodNotFound->value,
     $off->getByType(Dispatcher::class)->handle('api', '{"jsonrpc":"2.0","method":"rpc.discover","id":1}')['error']['code'],
 );
 
@@ -129,7 +132,7 @@ Assert::same(
 Assert::same('Ann', $call([['name' => 'Ann']])['result']['name'], 'positional parameters work too');
 
 $invalid = $call(['input' => ['name' => 'A', 'addresses' => [['city' => '']]], 'limit' => 0]);
-Assert::same(ApiException::E_INVALID_PARAMS, $invalid['error']['code']);
+Assert::same(ProtocolError::InvalidParams->value, $invalid['error']['code']);
 Assert::same(
     ['input.name' => 'must have at least 2 characters.', 'input.addresses.0.city' => 'must have at least 1 characters.', 'limit' => 'must be at least 1.'],
     $invalid['error']['fields'],

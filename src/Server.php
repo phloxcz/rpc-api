@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Phlox\RpcApi;
 
+use Phlox\ApiCore\ProtocolError;
+use Phlox\ApiCore\Attributes\ErrorCase;
 use Nette\Http\IRequest;
 use Nette\Http\IResponse;
 use Nette\Utils\Json;
@@ -96,7 +98,7 @@ final class Server
 
             return Json::encode([
                 'jsonrpc' => Dispatcher::JsonRpcVersion,
-                'error' => ['code' => ApiException::E_INTERNAL_ERROR, 'message' => ApiException::E_INTERNAL_ERROR_TEXT],
+                'error' => ['code' => ProtocolError::InternalError->value, 'message' => ErrorCase::of(ProtocolError::InternalError)->message],
                 'id' => null,
             ]);
         }

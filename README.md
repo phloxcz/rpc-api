@@ -80,7 +80,8 @@ class UserController extends ApiController
 
 - A request without an `id` member is a notification: it runs, and nothing is sent back, not even an error. `"id": null` is an ordinary request.
 - A batch larger than `maxBatchSize` is refused as a whole. Within a batch, a failing call doesn't affect the others.
-- Protocol errors use the standard codes `-32700`, `-32600`, `-32601`, `-32602` and `-32603`. Authorization errors use `401` and `403`.
+- Protocol errors use the standard codes `-32700`, `-32600`, `-32601`, `-32602` and `-32603`, see `ProtocolError`. Authorization errors use `401` and `403`.
+- An `ApiException` gives its `errorCode`, or its HTTP status without one: `new ApiException(404, 'Not found.')` is code `404`. `#[Throws]` documents the same code.
 - `data` of an `ApiException` is merged straight into the `error` object, next to `code` and `message`.
 - The HTTP status is `200` for anything with a body and `204` when there's none.
 
@@ -114,6 +115,16 @@ rpcApi:
                 info: {title: Orders API, version: 2.1.0}
                 servers:            # OpenRPC needs an absolute URL, so it's left out by default
                     - {name: production, url: 'https://api.example.com/api'}
+```
+
+The result comes from the native return type, or from `#[QueryOf]`. Where that says too little, such as `array`, `#[Result]` says it, with an object of [`Phlox\ApiCore\Schema`](https://github.com/phloxcz/api-core#describing-a-response). A docblock `@return` isn't read.
+
+```php
+use Phlox\ApiCore\Schema\{ListOf, Shape};
+use Phlox\RpcApi\Attributes\Result;
+
+#[Result(new Shape(['ids' => new ListOf('int')]), description: 'IDs of the new orders')]
+public function import(array $orders): array { /* ... */ }
 ```
 
 Authorization has no place in OpenRPC, so a method requiring login carries `x-authorize` and `x-roles`, with the same in its description and errors `401` and `403`. While the document is published, a method of your own named `rpc.discover` fails when the container compiles.
@@ -161,6 +172,7 @@ Changes that need checking in an existing project:
 - **Stricter protocol:** failed notifications no longer send an error, and `"id": null` is no longer a notification.
 - **The bootstrap runs before the API.** Code after `createContainer()` now also runs for API requests, including anything like a redirect or a maintenance mode. `index.php` has to call `Application::run()`.
 - **Dates and times:** a time zone alone, such as `x` or `utc`, is now refused instead of meaning the current time.
+- **Results are described by `#[Result]`,** not by `@return`. A method returning `array` without it is documented as any array, see [OpenRPC](#openrpc).
 - **The query language** moved to [`phloxcz/api-query`](https://github.com/phloxcz/api-query#migrating-from-abrad450api-server-nette), including `$this->processor`.
 
 ## License
